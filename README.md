@@ -50,7 +50,7 @@ uv sync
 uv run ndpsc-case-search-mcp
 ```
 
-The server starts on `http://0.0.0.0:8000` with the MCP endpoint at `/mcp` and a health check at `/health`.
+The server starts on `http://0.0.0.0:8000` with a Streamable HTTP MCP endpoint at `/mcp` and a health check at `/health`.
 
 ## Data Source
 

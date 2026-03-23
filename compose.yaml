@@ -3,7 +3,7 @@
 services:
   server:
     container_name: ndpsc_case_search_mcp
-    image: ndpsc-case-search-mcp
+    image: ghcr.io/hardmcp/ndpsc-case-search-mcp:latest
     restart: unless-stopped
     networks:
       - proxy
