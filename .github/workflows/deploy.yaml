@@ -12,15 +12,15 @@ permissions:
   packages: write
   security-events: write
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/ndpsc-case-search-mcp
-
 jobs:
   # Merge path: retag the staging image that CI already built and scanned
   promote:
     if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
+      - name: Set image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -45,7 +45,7 @@ jobs:
 
             const versions = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
               package_type: 'container',
-              package_name: 'ndpsc-case-search-mcp',
+              package_name: context.repo.repo,
               org: owner,
               per_page: 100
             });
@@ -57,7 +57,7 @@ jobs:
             if (staging) {
               await github.rest.packages.deletePackageVersionForOrg({
                 package_type: 'container',
-                package_name: 'ndpsc-case-search-mcp',
+                package_name: context.repo.repo,
                 org: owner,
                 package_version_id: staging.id
               });
@@ -73,6 +73,9 @@ jobs:
       !contains(github.event.head_commit.message, 'Merge pull request')
     runs-on: ubuntu-latest
     steps:
+      - name: Set image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
@@ -100,6 +103,6 @@ jobs:
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: success()
         with:
           sarif_file: trivy-results.sarif

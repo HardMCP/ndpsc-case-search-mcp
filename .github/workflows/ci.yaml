@@ -9,13 +9,13 @@ permissions:
   packages: write
   security-events: write
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/ndpsc-case-search-mcp
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Set image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
@@ -43,6 +43,6 @@ jobs:
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: success()
         with:
           sarif_file: trivy-results.sarif
