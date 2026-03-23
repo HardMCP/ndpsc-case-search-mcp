@@ -1,0 +1,105 @@
+name: Deploy
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/ndpsc-case-search-mcp
+
+jobs:
+  # Merge path: retag the staging image that CI already built and scanned
+  promote:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag staging image to production
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.IMAGE }}:latest \
+            ${{ env.IMAGE }}:pr-${{ github.event.pull_request.number }}
+
+      - name: Delete staging tag
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const prTag = 'pr-${{ github.event.pull_request.number }}';
+
+            const versions = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+              package_type: 'container',
+              package_name: 'ndpsc-case-search-mcp',
+              org: owner,
+              per_page: 100
+            });
+
+            const staging = versions.data.find(v =>
+              v.metadata?.container?.tags?.includes(prTag)
+            );
+
+            if (staging) {
+              await github.rest.packages.deletePackageVersionForOrg({
+                package_type: 'container',
+                package_name: 'ndpsc-case-search-mcp',
+                org: owner,
+                package_version_id: staging.id
+              });
+              core.info(`Deleted staging tag ${prTag}`);
+            } else {
+              core.info(`Staging tag ${prTag} not found, skipping cleanup`);
+            }
+
+  # Direct push path: full build pipeline
+  build:
+    if: >-
+      github.event_name == 'push' &&
+      !contains(github.event.head_commit.message, 'Merge pull request')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:latest
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE }}:latest
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
