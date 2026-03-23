@@ -8,7 +8,8 @@ The ND PSC regulates public utilities, pipelines, mining reclamation, and other 
 
 | Tool | Description |
 |------|-------------|
-| `search_cases` | Search cases by jurisdiction, year, status, category, entity, date range, and more. Returns up to 100 results. |
+| `search_cases` | Search cases by jurisdiction, year, status, category, entity, date range, and more. Automatically splits oversized searches so broad queries can return full result sets. |
+| `compare_case_type_by_year` | Summarize a case type across years with filed, closed, open, closure-rate, and median-days-to-close metrics. |
 | `get_case_detail` | Get full detail for a specific case including docket count. |
 | `get_docket_detail` | List files within a docket with direct PDF download links. |
 | `get_document_text` | Download a PDF and extract its text content. |
@@ -54,7 +55,7 @@ The server starts on `http://0.0.0.0:8000` with a Streamable HTTP MCP endpoint a
 
 ## Data Source
 
-This server scrapes [apps.psc.nd.gov/cases](https://apps.psc.nd.gov/cases/) -- no official API exists. Results are limited to 100 per search. Use narrower filters (date ranges, specific year) to find older cases.
+This server scrapes [apps.psc.nd.gov/cases](https://apps.psc.nd.gov/cases/) -- no official API exists. The PSC site pages search results at 100 rows per request; this server automatically splits broad case searches into smaller filed-date ranges so `search_cases` can return the full result set.
 
 ## License
 

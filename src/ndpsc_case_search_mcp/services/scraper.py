@@ -1,6 +1,7 @@
 """HTTP scraping helpers for apps.psc.nd.gov/cases/."""
 
 import re
+from datetime import date, timedelta
 
 import httpx
 from bs4 import BeautifulSoup
@@ -27,8 +28,17 @@ async def fetch_get(path: str, params: dict | None = None) -> BeautifulSoup:
     return BeautifulSoup(r.text, "html.parser")
 
 
+def _parse_total_cases(soup: BeautifulSoup) -> int:
+    text = soup.get_text()
+    for pattern in [r"\d+\s+of\s+(\d+)\s+Cases:", r"(\d+)\s+Cases:"]:
+        m = re.search(pattern, text)
+        if m:
+            return int(m.group(1))
+    return len(_parse_case_rows(soup))
+
+
 async def search_cases(data: dict) -> tuple[list[CaseSummary], str]:
-    """POST a search and return up to 100 results. Returns (cases, total_str)."""
+    """POST a search and return the first result page plus the total match count."""
     async with httpx.AsyncClient(
         headers=HEADERS, follow_redirects=True, timeout=20
     ) as client:
@@ -37,11 +47,74 @@ async def search_cases(data: dict) -> tuple[list[CaseSummary], str]:
 
     soup = BeautifulSoup(r.text, "html.parser")
     cases = _parse_case_rows(soup)
-
-    m = re.search(r"(\d+)\s+Cases:", soup.get_text())
-    total = m.group(1) if m else str(len(cases))
+    total = str(_parse_total_cases(soup))
 
     return cases, total
+
+
+def _initial_filed_range(data: dict) -> tuple[date, date]:
+    filed_from = data.get("filedFromDate")
+    filed_to = data.get("filedToDate")
+    if filed_from and filed_to:
+        return date.fromisoformat(filed_from), date.fromisoformat(filed_to)
+    if filed_from:
+        return date.fromisoformat(filed_from), date.today()
+    if filed_to:
+        return date(1900, 1, 1), date.fromisoformat(filed_to)
+
+    return date(1900, 1, 1), date.today()
+
+
+def _merge_cases(cases: list[CaseSummary]) -> list[CaseSummary]:
+    merged: dict[tuple[str, str, str], CaseSummary] = {}
+    for case in cases:
+        merged[(case.case_number, case.year or "", case.seq or "")] = case
+    return list(merged.values())
+
+
+def _case_sort_key(case: CaseSummary) -> tuple[int, int, str]:
+    year = int(case.year) if case.year and case.year.isdigit() else -1
+    seq = int(case.seq) if case.seq and case.seq.isdigit() else -1
+    return (-year, -seq, case.case_number)
+
+
+async def _search_cases_split(
+    data: dict, filed_from: date, filed_to: date
+) -> list[CaseSummary]:
+    bucket_data = dict(data)
+    bucket_data["filedFromDate"] = filed_from.isoformat()
+    bucket_data["filedToDate"] = filed_to.isoformat()
+
+    cases, total = await search_cases(bucket_data)
+    total_count = int(total)
+    if total_count <= 100:
+        return cases
+
+    if filed_from >= filed_to:
+        raise ValueError(
+            "Search still exceeds 100 cases within a single filed date. "
+            "Use a narrower query."
+        )
+
+    midpoint = date.fromordinal((filed_from.toordinal() + filed_to.toordinal()) // 2)
+    left_cases = await _search_cases_split(bucket_data, filed_from, midpoint)
+    right_cases = await _search_cases_split(
+        bucket_data, midpoint + timedelta(days=1), filed_to
+    )
+    return _merge_cases(left_cases + right_cases)
+
+
+async def search_cases_all(data: dict) -> tuple[list[CaseSummary], str]:
+    """POST a search and recursively split oversized result sets by filed date."""
+    cases, total = await search_cases(data)
+    total_count = int(total)
+    if total_count <= 100:
+        return cases, total
+
+    filed_from, filed_to = _initial_filed_range(data)
+    all_cases = await _search_cases_split(data, filed_from, filed_to)
+    all_cases = sorted(_merge_cases(all_cases), key=_case_sort_key)
+    return all_cases, str(len(all_cases))
 
 
 async def fetch_case_detail(year: str, sequence: str) -> CaseDetail:
