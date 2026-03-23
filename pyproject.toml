@@ -1,0 +1,23 @@
+[project]
+name = "ndpsc-case-search-mcp"
+version = "0.1.0"
+description = "MCP server for North Dakota PSC case search"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=3.1",
+    "httpx>=0.27.0",
+    "beautifulsoup4>=4.12.0",
+    "pymupdf>=1.24.0",
+]
+
+[project.scripts]
+ndpsc-case-search-mcp = "ndpsc_case_search_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.7",
+]

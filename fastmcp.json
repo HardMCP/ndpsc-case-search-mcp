@@ -1,0 +1,19 @@
+{
+  "$schema": "https://gofastmcp.com/public/schemas/fastmcp.json/v1.json",
+  "source": {
+    "type": "filesystem",
+    "path": "src/ndpsc_case_search_mcp/server.py",
+    "entrypoint": "mcp"
+  },
+  "environment": {
+    "type": "uv",
+    "python": ">=3.11",
+    "project": "."
+  },
+  "deployment": {
+    "transport": "http",
+    "host": "0.0.0.0",
+    "port": 8000,
+    "log_level": "INFO"
+  }
+}

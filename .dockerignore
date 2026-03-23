@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+dist
+build
+tools.yaml
+LICENSE
+*.md
+fastmcp.json
+compose.yaml
+.dockerignore
+Dockerfile

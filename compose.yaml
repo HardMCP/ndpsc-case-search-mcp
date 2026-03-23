@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+services:
+  server:
+    container_name: ndpsc_case_search_mcp
+    image: ndpsc-case-search-mcp
+    restart: unless-stopped
+    networks:
+      - proxy
+    environment:
+      TZ: "America/Chicago"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.ndpsc_case_search_mcp.rule: "Host(`hardmcp.com`) && PathPrefix(`/ndpsc-case-search`)"
+      traefik.http.routers.ndpsc_case_search_mcp.middlewares: "ndpsc_case_search_mcp_strip"
+      traefik.http.middlewares.ndpsc_case_search_mcp_strip.stripPrefix.prefixes: "/ndpsc-case-search"
+      traefik.http.services.ndpsc_case_search_mcp.loadBalancer.server.port: "8000"
+      net.unraid.docker.icon: "https://www.psc.nd.gov/sites/default/files/styles/logo/public/documents/theme/PSC%20Reverse_1.png"
+      net.unraid.docker.shell: "/bin/bash"
+
+networks:
+  proxy:
+    external: true
